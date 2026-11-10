@@ -8,13 +8,11 @@ FastAPI service that holds the Gemini API key server-side and exposes a single s
 
 ## Default model
 
-**`gemini-3.5-flash-lite`** — Google's recommended Flash-Lite model for new projects ([model card](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite)). Override with `GEMINI_MODEL` in `.env`.
-
-Legacy 2.5 models may be restricted for new API keys; see the [models guide](https://ai.google.dev/gemini-api/docs/models).
+**`gemini-3.5-flash-lite`** — a stable, cost-efficient Gemini model for high-throughput workloads ([model card](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite)). Override with `GEMINI_MODEL` in `.env`.
 
 ## API surface used
 
-- [Gemini Interactions API](https://ai.google.dev/gemini-api/docs/text-generation) via the official [`google-genai`](https://googleapis.github.io/python-genai/) Python SDK (`client.interactions.create`).
+- [Gemini Interactions API](https://ai.google.dev/gemini-api/docs/interactions-overview) via the official [`google-genai`](https://googleapis.github.io/python-genai/) Python SDK (`client.interactions.create`).
 - Stateless request per solve: `model`, `input` (user question), `system_instruction`, `generation_config.max_output_tokens`.
 - Response: `interaction.output_text` → JSON `{ "answer": "..." }` to the app.
 
@@ -67,6 +65,8 @@ source .venv/bin/activate
 pytest
 ```
 
+The default test suite uses mocked provider responses and offline regression fixtures. Live Gemini regression tests are opt-in and require both `GEMINI_API_KEY` and `SOLVELENS_GEMINI_LIVE_TESTS=1`; they may consume API quota.
+
 ## Flutter app (local E2E)
 
 Android emulator → host machine:
@@ -96,7 +96,7 @@ flutter test
 | `GEMINI_MODEL` | No | Default `gemini-3.5-flash-lite` |
 | `PORT` | No | Default `8080` when using uvicorn CLI |
 | `MAX_QUESTION_LENGTH` | No | Default `4000` |
-| `MAX_OUTPUT_TOKENS` | No | Default `1024` cap on model output |
+| `MAX_OUTPUT_TOKENS` | No | Default `640` output-token cap |
 
 ## Deployment
 

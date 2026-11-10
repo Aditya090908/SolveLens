@@ -22,7 +22,7 @@ def test_system_prompt_requires_direct_concise_math_style() -> None:
     assert "underdetermin" in prompt or "not uniquely" in prompt or "no unique" in prompt
     assert "inconsistent" in prompt
     assert "markdown" in prompt or "latex" in prompt
-    assert "wait" in prompt  # forbidden phrasing called out
+    assert "wait" in prompt
     assert "nest" in prompt and "$" in prompt
     assert "uniquely" in prompt or "unique" in prompt
     assert "invent" in prompt or "never invent" in prompt.replace("  ", " ")
@@ -113,9 +113,7 @@ def test_solve_question_empty_output(mock_client_cls: MagicMock) -> None:
 def test_solve_question_maps_httpx_timeout(mock_client_cls: MagicMock) -> None:
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.interactions.create.side_effect = httpx.TimeoutException(
-        "timed out"
-    )
+    mock_client.interactions.create.side_effect = httpx.TimeoutException("timed out")
 
     with pytest.raises(ProviderTimeoutError):
         solve_question(_settings(), "hi")
@@ -157,3 +155,22 @@ def test_solve_question_maps_httpx_connect_error(mock_client_cls: MagicMock) -> 
 
     with pytest.raises(ProviderConnectionError):
         solve_question(_settings(), "hi")
+
+
+@patch("app.gemini_client.genai.Client")
+def test_provider_exception_message_is_not_written_to_logs(
+    mock_client_cls: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.interactions.create.side_effect = Exception(
+        "sensitive request metadata"
+    )
+
+    with pytest.raises(ProviderError):
+        solve_question(_settings(), "hi")
+
+    assert "sensitive request metadata" not in caplog.text
+    assert "exc_type=Exception" in caplog.text
+    mock_client.close.assert_called_once()

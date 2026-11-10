@@ -83,17 +83,23 @@ def solve_question(settings: Settings, question: str) -> str:
         logger.warning(
             "gemini interactions.create httpx timeout after %.2fs: %s",
             time.perf_counter() - started,
-            exc,
+            type(exc).__name__,
         )
         raise ProviderTimeoutError()
-    except httpx.HTTPError:
-        raise ProviderConnectionError()
-    except Exception as exc:
+    except httpx.HTTPError as exc:
         logger.warning(
-            "gemini interactions.create failed after %.2fs exc_type=%s message=%s",
+            "gemini interactions.create transport failure after %.2fs type=%s",
             time.perf_counter() - started,
             type(exc).__name__,
-            exc,
+        )
+        raise ProviderConnectionError()
+    except Exception as exc:
+        # Provider exception messages can contain request metadata. Log only the
+        # exception class; never emit raw provider messages or request details.
+        logger.warning(
+            "gemini interactions.create failed after %.2fs exc_type=%s",
+            time.perf_counter() - started,
+            type(exc).__name__,
         )
         if _is_provider_timeout(exc):
             raise ProviderTimeoutError()

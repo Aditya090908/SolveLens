@@ -7,7 +7,3 @@ __pycache__/
 # Environment files and secrets
 .env*
 !.env.example
-
-# Environment files and secrets
-.env*
-!.env.example
