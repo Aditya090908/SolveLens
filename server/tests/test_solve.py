@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import Settings
 from app.gemini_client import (
     EmptyProviderResponseError,
     ProviderConnectionError,
@@ -10,10 +11,19 @@ from app.gemini_client import (
     ProviderRateLimitedError,
     ProviderTimeoutError,
 )
-from app.config import Settings
 from app.main import app, get_settings_dep
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def provide_test_settings():
+    """Keep API tests independent from a real Gemini key or local .env file."""
+    app.dependency_overrides[get_settings_dep] = lambda: Settings(
+        gemini_api_key="test-key"
+    )
+    yield
+    app.dependency_overrides.clear()
 
 
 def test_health() -> None:
@@ -99,9 +109,6 @@ def test_solve_question_too_long() -> None:
         gemini_api_key="test-key",
         max_question_length=10,
     )
-    try:
-        response = client.post("/v1/solve", json={"question": "12345678901"})
-        assert response.status_code == 400
-        assert response.json()["error"]["code"] == "question_too_long"
-    finally:
-        app.dependency_overrides.clear()
+    response = client.post("/v1/solve", json={"question": "12345678901"})
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "question_too_long"
