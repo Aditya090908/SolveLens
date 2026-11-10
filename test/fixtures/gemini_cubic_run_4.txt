@@ -1,0 +1,15 @@
+The value of $a^3 + b^3 + c^3$ is **$3$**.
+
+**Step 1:** Use the binomial expansion for the square of a sum:
+$$(a + b + c)^2 = a^2 + b^2 + c^2 + 2(ab + bc + ca)$$
+
+**Step 2:** Substitute the known values $a + b + c = 0$ and $a^2 + b^2 + c^2 = 6$:
+$$0^2 = 6 + 2(ab + bc + ca) \implies ab + bc + ca = -3$$
+
+**Step 3:** Use the algebraic identity for the sum of cubes:
+$$a^3 + b^3 + c^3 - 3abc = (a + b + c)(a^2 + b^2 + c^2 - ab - bc - ca)$$
+
+**Step 4:** Substitute $a + b + c = 0$ into the identity:
+$$a^3 + b^3 + c^3 - 3abc = 0 \cdot (6 - (-3)) = 0 \implies a^3 + b^3 + c^3 = 3abc$$
+
+*Note:* For $a, b, c$ satisfying the given system (e.g., $1, 1, -2$), $3abc = 3(1)(1)(-2) = -6$, which is unique under the standard algebraic implications derived from power sums.

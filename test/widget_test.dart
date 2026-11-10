@@ -1,9 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:solvelens/app_theme.dart';
+import 'package:solvelens/fake_solve_service.dart';
 import 'package:solvelens/home_screen.dart';
 import 'package:solvelens/main.dart';
+import 'package:solvelens/solve_service.dart';
+
+Widget _testApp({SolveService? solveService}) {
+  return SolveLensApp(
+    solveService:
+        solveService ??
+        FakeSolveService(
+          artificialDelay: const Duration(milliseconds: 50),
+        ),
+  );
+}
 
 /// Submits [text] through the keyboard send action, mirroring real UX
 /// (type, then press Enter/submit) rather than calling state directly.
@@ -21,7 +35,7 @@ void main() {
   testWidgets('shows branding and settings button', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     expect(find.text('SolveLens'), findsOneWidget);
@@ -31,7 +45,7 @@ void main() {
   testWidgets('shows headline, supporting text, and input controls when empty', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     expect(find.text('What can I solve for you today?'), findsOneWidget);
@@ -48,7 +62,7 @@ void main() {
   testWidgets('text input accepts and displays typed text', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), '2x + 3 = 7');
@@ -60,7 +74,7 @@ void main() {
   testWidgets('text input uses send action and multiline config', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     final TextField field = tester.widget(find.byType(TextField));
@@ -69,12 +83,13 @@ void main() {
     expect(field.minLines, 1);
   });
 
-  testWidgets('submitting adds user message, analyzing, then demo result',
+  testWidgets('submitting adds user message, analyzing, then AI result',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await _submitWithKeyboardAction(tester, '2x + 3 = 7');
+    await tester.pump();
 
     // User message appears immediately alongside the analyzing state.
     expect(find.text('2x + 3 = 7'), findsOneWidget);
@@ -84,31 +99,58 @@ void main() {
     expect(tester.widget<TextField>(find.byType(TextField)).controller?.text,
         isEmpty);
 
-    // Deterministic local demo answer replaces the analyzing state.
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
     expect(find.text('Analyzing...'), findsNothing);
-    expect(find.text('x = 2'), findsOneWidget);
-    expect(find.text('Demo · local result'), findsWidgets);
+    expect(find.textContaining('Subtract 3'), findsOneWidget);
+    expect(find.text('SolveLens AI'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('input clears after submission', (WidgetTester tester) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await _submitWithKeyboardAction(tester, '2 + 2');
     expect(tester.widget<TextField>(find.byType(TextField)).controller?.text,
         isEmpty);
 
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+    expect(find.text('4'), findsOneWidget);
+  });
+
+  testWidgets('ignores additional submit while analyzing', (
+    WidgetTester tester,
+  ) async {
+    final Completer<SolveOutcome> pending = Completer<SolveOutcome>();
+    await tester.pumpWidget(
+      _testApp(
+        solveService: FakeSolveService(
+          onSolve: (_) => pending.future,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _submitWithKeyboardAction(tester, '2 + 2');
+    expect(find.text('Analyzing...'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'ignored');
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+
+    expect(find.text('ignored'), findsNothing);
+    expect(find.text('2 + 2'), findsOneWidget);
+
+    pending.complete(const SolveOk(SolveSuccess('4')));
     await tester.pumpAndSettle();
     expect(find.text('4'), findsOneWidget);
   });
 
   testWidgets('empty and whitespace input creates no message but clears',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await _submitWithKeyboardAction(tester, '   ');
@@ -127,30 +169,27 @@ void main() {
   testWidgets('multiple messages can be submitted and scrolled', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await _submitWithKeyboardAction(tester, '2 + 2');
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
     expect(find.text('4'), findsOneWidget);
 
     await _submitWithKeyboardAction(tester, '2x + 3 = 7');
+    await tester.pump();
     // Second analyzing state appears while the first answer stays visible.
     expect(find.text('Analyzing...'), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
-    expect(find.text('x = 2'), findsOneWidget);
+    expect(find.textContaining('Subtract 3'), findsWidgets);
 
     await _submitWithKeyboardAction(tester, 'what is pi?');
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'Demo mode: I received your question. '
-        'Real AI solving will be connected in a later phase.',
-      ),
+      find.textContaining('Fake AI: I received your question.'),
       findsOneWidget,
     );
 
@@ -164,12 +203,11 @@ void main() {
   testWidgets('hero hides once conversation starts', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
     expect(find.text('What can I solve for you today?'), findsOneWidget);
 
     await _submitWithKeyboardAction(tester, '2 + 2');
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
     expect(find.text('What can I solve for you today?'), findsNothing);
   });
@@ -181,7 +219,7 @@ void main() {
       MaterialApp(
         theme: SolveLensTheme.dark(),
         themeMode: ThemeMode.dark,
-        home: const HomeScreen(),
+        home: HomeScreen(solveService: FakeSolveService()),
       ),
     );
     await tester.pumpAndSettle();
@@ -192,30 +230,53 @@ void main() {
     expect(find.text('x^2 + 5'), findsOneWidget);
   });
 
-  testWidgets('dark theme conversation shows demo answer', (
+  testWidgets('dark theme conversation shows fake AI answer', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: SolveLensTheme.dark(),
         themeMode: ThemeMode.dark,
-        home: const HomeScreen(),
+        home: HomeScreen(solveService: FakeSolveService()),
       ),
     );
     await tester.pumpAndSettle();
 
     await _submitWithKeyboardAction(tester, '2x + 3 = 7');
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
 
-    expect(find.text('x = 2'), findsOneWidget);
+    expect(find.textContaining('Subtract 3'), findsWidgets);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows solve error in assistant bubble', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _testApp(
+        solveService: FakeSolveService(
+          onSolve: (_) async => SolveErr(
+            SolveFailure(
+              kind: SolveErrorKind.network,
+              userMessage: 'Network failed for test.',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _submitWithKeyboardAction(tester, 'hello');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Network failed for test.'), findsOneWidget);
+    expect(find.text('Analyzing...'), findsNothing);
   });
 
   testWidgets('plus, microphone, and settings buttons are no-op taps', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.add));
@@ -233,11 +294,10 @@ void main() {
   testWidgets('plus, mic, settings stay present and inert after messages', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await _submitWithKeyboardAction(tester, '2 + 2');
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.add), findsOneWidget);
@@ -259,7 +319,7 @@ void main() {
   testWidgets('has no drawer, app bar, or hamburger menu control', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.menu), findsNothing);
@@ -273,7 +333,7 @@ void main() {
   testWidgets('builds in light and dark themes without overflow', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
@@ -281,7 +341,7 @@ void main() {
       MaterialApp(
         theme: SolveLensTheme.dark(),
         themeMode: ThemeMode.dark,
-        home: const HomeScreen(),
+        home: HomeScreen(solveService: FakeSolveService()),
       ),
     );
     await tester.pumpAndSettle();
@@ -297,18 +357,42 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const SolveLensApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await _submitWithKeyboardAction(tester, '2x + 3 = 7');
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
     await _submitWithKeyboardAction(tester, '2 + 2');
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
 
-    expect(find.text('x = 2'), findsOneWidget);
+    expect(find.textContaining('Subtract 3'), findsWidgets);
     expect(find.text('4'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('regression: linear, quadratic, and underdetermined answers',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_testApp());
+    await tester.pumpAndSettle();
+
+    await _submitWithKeyboardAction(tester, '2x + 3 = 7');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Subtract 3'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await _submitWithKeyboardAction(tester, 'x² - 5x + 6 = 0');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Roots:'), findsOneWidget);
+    expect(find.textContaining(r'$x=3$'), findsNothing);
+    expect(find.textContaining(r'$x=2$'), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await _submitWithKeyboardAction(
+      tester,
+      'a + b + c = 0; a² + b² + c² = 6. Find a³ + b³ + c³',
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Not uniquely'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

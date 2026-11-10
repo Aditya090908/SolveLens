@@ -1,0 +1,9 @@
+$a^3+b^3+c^3=3abc$
+
+Using the algebraic identity for the sum of cubes:
+
+$a^3+b^3+c^3-3abc=(a+b+c)(a^2+b^2+c^2-ab-bc-ca)$
+
+Since $a+b+c=0$, the right side becomes zero.
+
+However, the value of $abc$ is not uniquely determined by the given equations. For instance, $(1,1,-2)$ and $(2,-1,-1)$ both satisfy the givens but yield different values.

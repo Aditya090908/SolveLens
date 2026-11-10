@@ -1,0 +1,17 @@
+$a^3 + b^3 + c^3 = 3abc$. 
+
+To find the value, we use the algebraic identity:
+$$(a+b+c)^2 = a^2 + b^2 + c^2 + 2(ab + bc + ca)$$
+
+Substitute the given values into the identity:
+$$0^2 = 6 + 2(ab + bc + ca) \implies ab + bc + ca = -3$$
+
+Next, use the sum-of-cubes identity:
+$$a^3 + b^3 + c^3 - 3abc = (a+b+c)(a^2 + b^2 + c^2 - ab - bc - ca)$$
+
+Since $a+b+c = 0$, the right side becomes zero:
+$$a^3 + b^3 + c^3 - 3abc = 0 \implies a^3 + b^3 + c^3 = 3abc$$
+
+However, the value of $abc$ is not uniquely determined by the given equations (for example, $(a,b,c) = (1, 1, -2)$ and $(1, \sqrt{2}-1, -\sqrt{2})$ both satisfy the conditions but yield different values for $abc$). 
+
+Thus, the requested quantity is not uniquely determined.

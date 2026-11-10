@@ -1,0 +1,15 @@
+$a^3 + b^3 + c^3 = 3abc$. 
+
+Using the algebraic identity:
+$$(a + b + c)^2 = a^2 + b^2 + c^2 + 2(ab + bc + ca)$$
+
+Substitute the given values $a + b + c = 0$ and $a^2 + b^2 + c^2 = 6$:
+$$0^2 = 6 + 2(ab + bc + ca) \implies ab + bc + ca = -3$$
+
+Next, use the identity for the sum of cubes:
+$$a^3 + b^3 + c^3 - 3abc = (a + b + c)(a^2 + b^2 + c^2 - ab - bc - ca)$$
+
+Since $a + b + c = 0$, the right side becomes zero:
+$$a^3 + b^3 + c^3 - 3abc = 0 \implies a^3 + b^3 + c^3 = 3abc$$
+
+*Note:* The value of $abc$ is not uniquely determined by the given equations (e.g., $a=1, b=1, c=-2$ gives $abc = -2$ and $a^3+b^3+c^3 = -6$, while other valid triples give different products), so the exact numerical value of $a^3+b^3+c^3$ cannot be uniquely fixed.

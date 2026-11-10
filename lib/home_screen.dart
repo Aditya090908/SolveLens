@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'assistant_message_body.dart';
 import 'app_theme.dart';
-import 'demo_solver.dart';
 import 'math_hero.dart';
+import 'solve_service.dart';
 
-/// Phase 2 home screen: local/demo conversation interface.
+/// Home screen: in-memory conversation with AI answers via [SolveService].
 ///
-/// In-memory conversation only: user messages, a transient "Analyzing..."
-/// assistant state, and deterministic answers from [solveDemo]. No AI API,
-/// backend, camera, gallery, microphone, persistence, or navigation.
+/// No camera, gallery, microphone, persistence, or navigation. One solve
+/// request in flight at a time.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, required this.solveService});
+
+  final SolveService solveService;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -20,6 +22,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final List<_ChatMessage> _messages = <_ChatMessage>[];
   int _nextId = 0;
+  bool _isSolving = false;
   late final TextEditingController _controller;
   late final ScrollController _scrollController;
   late final FocusNode _focusNode;
@@ -83,7 +86,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _submit(String raw) {
+  Future<void> _submit(String raw) async {
+    if (_isSolving) {
+      return;
+    }
     final String text = raw.trim();
     if (text.isEmpty) {
       // Approved behavior: clear whitespace-only input, create no message.
@@ -98,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final int userId = _nextId++;
     final int analyzingId = _nextId++;
     setState(() {
+      _isSolving = true;
       _messages.add(
         _ChatMessage(id: userId, author: _MessageAuthor.user, text: text),
       );
@@ -111,25 +118,29 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     });
     _scrollToBottom();
-    Future<void>.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted) {
-        return;
-      }
-      final String answer = solveDemo(text);
-      setState(() {
-        final int index = _messages.indexWhere(
-          (_ChatMessage m) => m.id == analyzingId,
+
+    final SolveOutcome outcome = await widget.solveService.solve(text);
+    if (!mounted) {
+      return;
+    }
+    final String assistantText = switch (outcome) {
+      SolveOk(:final success) => success.answer,
+      SolveErr(:final failure) => failure.userMessage,
+    };
+    setState(() {
+      _isSolving = false;
+      final int index = _messages.indexWhere(
+        (_ChatMessage m) => m.id == analyzingId,
+      );
+      if (index != -1) {
+        _messages[index] = _ChatMessage(
+          id: analyzingId,
+          author: _MessageAuthor.assistant,
+          text: assistantText,
         );
-        if (index != -1) {
-          _messages[index] = _ChatMessage(
-            id: analyzingId,
-            author: _MessageAuthor.assistant,
-            text: answer,
-          );
-        }
-      });
-      _scrollToBottom();
+      }
     });
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -262,6 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _HomeInputBar(
                 controller: _controller,
                 focusNode: _focusNode,
+                enabled: !_isSolving,
                 onSubmitted: _submit,
               ),
             ),
@@ -296,7 +308,7 @@ class _ChatMessage {
 ///
 /// User messages use the SolveLens brand gradient; assistant messages use a
 /// theme-aware surface with a small "Demo · local result" caption so the
-/// local demo is never mistaken for a real AI answer.
+/// Assistant caption labels AI-backed answers from the SolveLens proxy.
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message});
 
@@ -367,7 +379,7 @@ class _MessageBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Text(
-                'Demo · local result',
+                'SolveLens AI',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: SolveLensTheme.brandPurple.withValues(
                     alpha: isDark ? 0.9 : 0.8,
@@ -398,13 +410,7 @@ class _MessageBubble extends StatelessWidget {
                   ],
                 )
               else
-                Text(
-                  message.text,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    height: 1.4,
-                  ),
-                ),
+                AssistantMessageBody(data: message.text),
             ],
           ),
         ),
@@ -421,11 +427,13 @@ class _HomeInputBar extends StatelessWidget {
   const _HomeInputBar({
     required this.controller,
     required this.focusNode,
+    required this.enabled,
     required this.onSubmitted,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
+  final bool enabled;
   final ValueChanged<String> onSubmitted;
 
   @override
@@ -465,6 +473,7 @@ class _HomeInputBar extends StatelessWidget {
             child: TextField(
               controller: controller,
               focusNode: focusNode,
+              enabled: enabled,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface,
               ),

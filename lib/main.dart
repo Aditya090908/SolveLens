@@ -1,18 +1,31 @@
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
+import 'config.dart';
+import 'fake_solve_service.dart';
 import 'home_screen.dart';
+import 'remote_solve_service.dart';
+import 'solve_service.dart';
 
-void main() {
-  runApp(const SolveLensApp());
+SolveService createDefaultSolveService() {
+  if (SolveLensConfig.useFakeSolver) {
+    return FakeSolveService();
+  }
+  return RemoteSolveService();
 }
 
-/// Root widget for SolveLens Phase 1.
+void main() {
+  runApp(SolveLensApp(solveService: createDefaultSolveService()));
+}
+
+/// Root widget for SolveLens.
 ///
-/// Visual home-screen foundation with system-selected light/dark themes.
-/// No AI, navigation, or backend behavior.
+/// System light/dark themes; Phase 3 routes questions through [SolveService]
+/// (remote proxy by default, fake when configured for tests).
 class SolveLensApp extends StatelessWidget {
-  const SolveLensApp({super.key});
+  const SolveLensApp({super.key, required this.solveService});
+
+  final SolveService solveService;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +34,7 @@ class SolveLensApp extends StatelessWidget {
       theme: SolveLensTheme.light(),
       darkTheme: SolveLensTheme.dark(),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: HomeScreen(solveService: solveService),
     );
   }
 }
