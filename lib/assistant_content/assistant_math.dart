@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 
 /// Inline math via [Math.tex] with plain-text fallback (no Parser Error UI).
